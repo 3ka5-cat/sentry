@@ -5,7 +5,6 @@ from sentry.notifications.types import (
     UserOptionsSettingsKey,
 )
 
-
 class UserOptionValue:
     # 'workflow:notifications'
     all_conversations = "0"
