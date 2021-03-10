@@ -8,52 +8,44 @@ from sentry.models import (
     Deploy,
     Environment,
     GroupSubscriptionReason,
+    NotificationSetting,
     Release,
     ReleaseCommit,
     Repository,
     UserEmail,
-    UserOption,
 )
 from sentry.mail.activity.release import ReleaseActivityEmail
-from sentry.notifications.legacy_mappings import UserOptionValue
+from sentry.models.integration import ExternalProviders
+from sentry.notifications.types import (
+    NotificationSettingTypes,
+    NotificationSettingOptionValues,
+)
 from sentry.testutils import TestCase
 
 
 class ReleaseTestCase(TestCase):
     def setUp(self):
         super().setUp()
-        self.user = self.create_user("foo@example.com")
 
-        assert UserEmail.objects.filter(user=self.user, email=self.user.email).update(
-            is_verified=True
-        )
+        def another_user(email_string, alt_email_string=None):
+            user = self.create_user(email_string)
+            if alt_email_string:
+                UserEmail.objects.create(email=alt_email_string, user=user)
 
-        self.user2 = self.create_user("bar@example.com")
-        assert UserEmail.objects.filter(user=self.user2, email=self.user2.email).update(
-            is_verified=True
-        )
+                assert UserEmail.objects.filter(user=user, email=alt_email_string).update(
+                    is_verified=True
+                )
 
-        self.user3 = self.create_user("baz@example.com")
-        assert UserEmail.objects.filter(user=self.user3, email=self.user3.email).update(
-            is_verified=True
-        )
+            assert UserEmail.objects.filter(user=user, email=user.email).update(is_verified=True)
+            return user
 
-        self.user4 = self.create_user("floop@example.com")
-        assert UserEmail.objects.filter(user=self.user4, email=self.user4.email).update(
-            is_verified=True
-        )
-
-        self.user5 = self.create_user("companyemail@example.com")
         user5_alt_email = "privateEmail@gmail.com"
-        UserEmail.objects.create(email=user5_alt_email, user=self.user5)
 
-        assert UserEmail.objects.filter(user=self.user5, email=self.user5.email).update(
-            is_verified=True
-        )
-
-        assert UserEmail.objects.filter(user=self.user5, email=user5_alt_email).update(
-            is_verified=True
-        )
+        self.user = another_user("foo@example.com")
+        self.user2 = another_user("bar@example.com")
+        self.user3 = another_user("baz@example.com")
+        self.user4 = another_user("floop@example.com")
+        self.user5 = another_user("companyemail@example.com", user5_alt_email)
 
         self.org = self.create_organization(owner=None)
         self.org.flags.allow_joinleave = False
@@ -142,26 +134,28 @@ class ReleaseTestCase(TestCase):
             order=3,
         )
 
-        UserOption.objects.set_value(
+        NotificationSetting.objects.update_settings(
+            ExternalProviders.EMAIL,
+            NotificationSettingTypes.DEPLOY,
+            NotificationSettingOptionValues.ALWAYS,
             user=self.user3,
             organization=self.org,
-            key="deploy-emails",
-            value=UserOptionValue.all_deploys,
         )
 
-        UserOption.objects.set_value(
+        NotificationSetting.objects.update_settings(
+            ExternalProviders.EMAIL,
+            NotificationSettingTypes.DEPLOY,
+            NotificationSettingOptionValues.NEVER,
             user=self.user4,
             organization=self.org,
-            key="deploy-emails",
-            value=UserOptionValue.no_deploys,
         )
 
         # added to make sure org default above takes precedent
-        UserOption.objects.set_value(
+        NotificationSetting.objects.update_settings(
+            ExternalProviders.EMAIL,
+            NotificationSettingTypes.DEPLOY,
+            NotificationSettingOptionValues.ALWAYS,
             user=self.user4,
-            organization=None,
-            key="deploy-emails",
-            value=UserOptionValue.all_deploys,
         )
 
     def test_simple(self):
@@ -272,8 +266,11 @@ class ReleaseTestCase(TestCase):
         user6 = self.create_user()
         self.create_member(user=user6, organization=self.org, teams=[self.team])
 
-        UserOption.objects.set_value(
-            user=user6, organization=None, key="deploy-emails", value=UserOptionValue.all_deploys
+        NotificationSetting.objects.update_settings(
+            ExternalProviders.EMAIL,
+            NotificationSettingTypes.DEPLOY,
+            NotificationSettingOptionValues.ALWAYS,
+            user=user6,
         )
 
         release = Release.objects.create(
