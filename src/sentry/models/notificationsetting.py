@@ -5,6 +5,7 @@ from sentry.db.models import (
     sane_repr,
 )
 from sentry.models.integration import ExternalProviders
+from sentry.notifications.manager import NotificationsManager
 from sentry.notifications.types import (
     NotificationScopeType,
     NotificationSettingOptionValues,
@@ -60,6 +61,8 @@ class NotificationSetting(Model):
         ),
         null=False,
     )
+
+    objects = NotificationsManager()
 
     class Meta:
         app_label = "sentry"
