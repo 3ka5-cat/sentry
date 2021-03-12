@@ -83,17 +83,6 @@ NOTIFICATION_SCOPE_TYPE = {
 }
 
 
-class NotificationTargetType(Enum):
-    USER = 0
-    TEAM = 10
-
-
-NOTIFICATION_TARGET_TYPE = {
-    NotificationTargetType.USER: "user",
-    NotificationTargetType.TEAM: "team",
-}
-
-
 class FineTuningAPIKey(Enum):
     ALERTS = "alerts"
     DEPLOY = "deploy"

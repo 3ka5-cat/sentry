@@ -1,6 +1,7 @@
 from sentry.db.models import (
     BoundedBigIntegerField,
     BoundedPositiveIntegerField,
+    FlexibleForeignKey,
     Model,
     sane_repr,
 )
@@ -10,7 +11,6 @@ from sentry.notifications.types import (
     NotificationScopeType,
     NotificationSettingOptionValues,
     NotificationSettingTypes,
-    NotificationTargetType,
 )
 
 
@@ -34,6 +34,8 @@ class NotificationSetting(Model):
     )
     # user_id, organization_id, project_id
     scope_identifier = BoundedBigIntegerField(null=False)
+
+    target = FlexibleForeignKey("sentry.Actor")
 
     provider = BoundedPositiveIntegerField(
         choices=(
