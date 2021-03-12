@@ -5,7 +5,7 @@ from sentry.models.integration import ExternalProviders
 from sentry.notifications.types import (
     NotificationScopeType,
     NotificationSettingOptionValues,
-    NotificationSettingTypes, NotificationTargetType,
+    NotificationSettingTypes,
 )
 from sentry.models.useroption import UserOption
 from sentry.notifications.legacy_mappings import (
@@ -203,9 +203,10 @@ class NotificationsManager(BaseManager):
         self,
         provider: ExternalProviders,
         type: NotificationSettingTypes,
-        user_id=None,
-        team_id=None,
-        **kwargs,
+        user=None,
+        team=None,
+        project=None,
+        organization=None,
     ):
         """
         We don't anticipate this function will be used by the API but is useful
@@ -213,17 +214,16 @@ class NotificationsManager(BaseManager):
         to set a notification preference to DEFAULT.
         :param provider: ExternalProviders enum
         :param type: NotificationSettingTypes enum
-        :param user_id: User object's ID
-        :param team_id: Team object's ID
-        :param kwargs: (deprecated) User object
+        :param user: (Optional) User object
+        :param team: (Optional) Team object
+        :param project: (Optional) Project object
+        :param organization: (Optional) Organization object
         """
-
-        kwargs = kwargs or {}
-        project_option = kwargs.get("project")
-        user_id_option = user_id or getattr(kwargs.get("user"), "id", None)
-        team_id_option = team_id or getattr(kwargs.get("team"), "id", None)
-        scope_type, scope_identifier = _get_scope(user_id_option, project=project_option)
-        target = _get_target(user_id_option, team_id_option)
+        user_id_option = getattr(user, "id", None)
+        scope_type, scope_identifier = _get_scope(
+            user_id_option, project=project, organization=organization
+        )
+        target = _get_target(user, team)
 
         with transaction.atomic():
             self.filter(
@@ -231,25 +231,19 @@ class NotificationsManager(BaseManager):
                 type=type.value,
                 scope_type=scope_type,
                 scope_identifier=scope_identifier,
-                target_type=target_type,
-                target_identifier=target_identifier,
+                target=target,
             ).delete()
 
-            UserOption.objects.unset_value(user, project_option, get_legacy_key(type))
+            UserOption.objects.unset_value(user, project, get_legacy_key(type))
 
     def remove_settings_for_user(self, user, type: NotificationSettingTypes = None):
         if type:
             # We don't need a transaction because this is only used in tests.
             UserOption.objects.filter(user=user, key=get_legacy_key(type)).delete()
-            self.filter(
-                target_type=NotificationTargetType.USER.value,
-                target_identifier=user.id,
-                type=type.value,
-            ).delete()
-
+            self.filter(target=user.actor, type=type.value).delete()
         else:
             UserOption.objects.filter(user=user, key__in=KEYS_TO_LEGACY_KEYS.values()).delete()
-            self.filter(target=user).delete()
+            self.filter(target=user.actor).delete()
 
     @staticmethod
     def remove_settings_for_team():

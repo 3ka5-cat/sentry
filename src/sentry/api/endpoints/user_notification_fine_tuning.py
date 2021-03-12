@@ -14,7 +14,7 @@ from sentry.models.integration import ExternalProviders
 from sentry.notifications.legacy_mappings import (
     get_legacy_key_from_fine_tuning_key,
     get_option_value_from_int,
-    get_type_from_fine_tuning_key, 
+    get_type_from_fine_tuning_key,
 )
 from sentry.notifications.types import FineTuningAPIKey
 
