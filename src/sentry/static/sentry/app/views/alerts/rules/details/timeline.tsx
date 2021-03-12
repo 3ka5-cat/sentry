@@ -2,7 +2,6 @@ import React from 'react';
 import styled from '@emotion/styled';
 import moment from 'moment-timezone';
 
-import {fetchIncidentActivities} from 'app/actionCreators/incident';
 import {Client} from 'app/api';
 import DateTime from 'app/components/dateTime';
 import Duration from 'app/components/duration';
@@ -25,8 +24,6 @@ import {
 } from 'app/views/alerts/types';
 import {IncidentRule} from 'app/views/settings/incidentRules/types';
 
-type Activities = Array<ActivityType>;
-
 type IncidentProps = {
   api: Client;
   orgId: string;
@@ -34,52 +31,10 @@ type IncidentProps = {
   rule: IncidentRule;
 };
 
-type IncidentState = {
-  loading: boolean;
-  error: boolean;
-  activities: null | Activities;
-};
-
-class TimelineIncident extends React.Component<IncidentProps, IncidentState> {
-  state: IncidentState = {
-    loading: true,
-    error: false,
-    activities: null,
-  };
-
-  componentDidMount() {
-    this.fetchData();
-  }
-
-  componentDidUpdate(prevProps: IncidentProps) {
-    // Only refetch if incidentStatus changes.
-    //
-    // This component can mount before incident details is fully loaded.
-    // In which case, `incidentStatus` is null and we will be fetching via `cDM`
-    // There's no need to fetch this gets updated due to incident details being loaded
-    if (
-      prevProps.incident.status !== null &&
-      prevProps.incident.status !== this.props.incident.status
-    ) {
-      this.fetchData();
-    }
-  }
-
-  async fetchData() {
-    const {api, orgId, incident} = this.props;
-
-    try {
-      const activities = await fetchIncidentActivities(api, orgId, incident.identifier);
-      this.setState({activities, loading: false});
-    } catch (err) {
-      this.setState({loading: false, error: !!err});
-    }
-  }
-
+class TimelineIncident extends React.Component<IncidentProps> {
   renderActivity(activity: ActivityType, idx: number) {
     const {incident, rule} = this.props;
-    const {activities} = this.state;
-    const last = this.state.activities && idx === this.state.activities.length - 1;
+    const last = incident.activities && idx === incident.activities.length - 1;
     const authorName = activity.user?.name ?? 'Sentry';
 
     const isDetected = activity.type === IncidentActivityType.DETECTED;
@@ -93,8 +48,8 @@ class TimelineIncident extends React.Component<IncidentProps, IncidentState> {
     // Unknown activity, don't render anything
     if (
       (!isStarted && !isDetected && !isClosed && !isTriggerChange) ||
-      !activities ||
-      !activities.length
+      !incident.activities ||
+      !incident.activities.length
     ) {
       return null;
     }
@@ -105,10 +60,10 @@ class TimelineIncident extends React.Component<IncidentProps, IncidentState> {
     let subtext: React.ReactNode;
     if (isTriggerChange) {
       const nextActivity =
-        activities.find(({previousValue}) => previousValue === activity.value) ||
+        incident.activities.find(({previousValue}) => previousValue === activity.value) ||
         (activity.value &&
           activity.value === `${IncidentStatus.OPENED}` &&
-          activities.find(({type}) => type === IncidentActivityType.DETECTED));
+          incident.activities.find(({type}) => type === IncidentActivityType.DETECTED));
       const activityDuration = (nextActivity
         ? moment(nextActivity.dateCreated)
         : moment()
@@ -180,14 +135,13 @@ class TimelineIncident extends React.Component<IncidentProps, IncidentState> {
 
   render() {
     const {incident} = this.props;
-    const {activities} = this.state;
 
     let Icon = IconCheckmark;
     let color: string = theme.green300;
 
     if (
       // incident was at max critical
-      activities?.find(
+      incident.activities?.find(
         ({type, value}) =>
           type === IncidentActivityType.STATUS_CHANGE &&
           value === `${IncidentStatus.CRITICAL}`
@@ -197,7 +151,7 @@ class TimelineIncident extends React.Component<IncidentProps, IncidentState> {
       color = theme.red300;
     } else if (
       // incident was at max warning
-      activities?.find(
+      incident.activities?.find(
         ({type, value}) =>
           type === IncidentActivityType.STATUS_CHANGE &&
           value === `${IncidentStatus.WARNING}`
@@ -226,9 +180,9 @@ class TimelineIncident extends React.Component<IncidentProps, IncidentState> {
             )}
           </SeenByTab>
         </IncidentHeader>
-        {activities && (
+        {incident.activities && (
           <IncidentBody>
-            {activities
+            {incident.activities
               .filter(activity => activity.type !== IncidentActivityType.COMMENT)
               .map((activity, idx) => this.renderActivity(activity, idx))}
           </IncidentBody>
